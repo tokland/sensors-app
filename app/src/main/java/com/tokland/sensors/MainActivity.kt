@@ -5,6 +5,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.hardware.camera2.CameraManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -14,14 +15,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import com.tokland.sensors.ui.theme.SensorsTheme
 
 class MainActivity : ComponentActivity(), SensorEventListener {
-
     private lateinit var sensorManager: SensorManager
     private var rotationVectorSensor: Sensor? = null
+    private var _angle by mutableDoubleStateOf(0.0)
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,7 +45,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             SensorsTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Greeting(
-                        name = "Android",
+                        name = "Android  %.1f".format(_angle),
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
@@ -52,6 +56,19 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         println("tokland:debug:end")
     }
 
+    fun torchToggleButton(state: Boolean) {
+        //var isTorchOn by remember { mutableStateOf(false) }
+        val cameraManager = getSystemService(CameraManager::class.java)
+        val cameraId = cameraManager.cameraIdList.firstOrNull { id ->
+            cameraManager.getCameraCharacteristics(id).get(
+                android.hardware.camera2.CameraCharacteristics.FLASH_INFO_AVAILABLE
+            ) == true
+        }
+
+        if (cameraId != null) {
+            cameraManager.setTorchMode(cameraId, state)
+        }
+    }
     override fun onSensorChanged(event: SensorEvent?) {
         if (event?.sensor?.type == Sensor.TYPE_ROTATION_VECTOR) {
             // Get rotation matrix from the sensor event
@@ -64,9 +81,18 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 
             // Convert pitch (X-axis rotation) from radians to degrees
             val pitchInDegrees = (orientationValues[1].toDouble()) * 180 / Math.PI
+            _angle = pitchInDegrees
 
             // Print the X-axis angle (pitch) to the console
             println("tokland:debug:X-axis angle X: %.1f".format(pitchInDegrees))
+
+            /*
+            if (pitchInDegrees > 45) {
+                this.torchToggleButton(true)
+            } else {
+                this.torchToggleButton(false)
+            }
+             */
         }
     }
 
@@ -89,10 +115,4 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
     )
 }
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    SensorsTheme {
-        Greeting("Android")
-    }
-}
+
