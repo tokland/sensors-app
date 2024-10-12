@@ -1,6 +1,7 @@
 package com.tokland.sensors
 
 import android.content.Context
+import android.content.Intent
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -14,19 +15,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.tokland.sensors.ui.theme.SensorsTheme
 
 class MainActivity : ComponentActivity(), SensorEventListener {
     private lateinit var sensorManager: SensorManager
     private var rotationVectorSensor: Sensor? = null
-    private var _angle by mutableStateOf(0.0)
+    private var _angle by mutableStateOf(0.0) // Declare a state for the angle
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        val serviceIntent = Intent(this, MyForegroundService::class.java)
+        startService(serviceIntent)
 
         // Initialize SensorManager and Sensor
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
@@ -41,20 +44,23 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         setContent {
             SensorsTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                    // Pass the dynamic angle value to the Greeting composable
                     Greeting(
-                        name = "Android  %.1f".format(_angle),
+                        name = "Android, Angle: %.1f".format(_angle),
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
             }
         }
 
-        // Debug print statement to mark end of onCreate
+        this.torchToggleButton(true)
+        
+        // Debug print statement to mark the end of onCreate
         println("tokland:debug:end")
     }
 
     fun torchToggleButton(state: Boolean) {
-        //var isTorchOn by remember { mutableStateOf(false) }
+        // Control the torch using CameraManager
         val cameraManager = getSystemService(CameraManager::class.java)
         val cameraId = cameraManager.cameraIdList.firstOrNull { id ->
             cameraManager.getCameraCharacteristics(id).get(
@@ -62,10 +68,11 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             ) == true
         }
 
-        if (cameraId != null) {
-            cameraManager.setTorchMode(cameraId, state)
+        cameraId?.let {
+            cameraManager.setTorchMode(it, state)
         }
     }
+
     override fun onSensorChanged(event: SensorEvent?) {
         if (event?.sensor?.type == Sensor.TYPE_ROTATION_VECTOR) {
             // Get rotation matrix from the sensor event
@@ -77,19 +84,18 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             SensorManager.getOrientation(rotationMatrix, orientationValues)
 
             // Convert pitch (X-axis rotation) from radians to degrees
-            val pitchInDegrees = (orientationValues[1].toDouble()) * 180 / Math.PI
+            val pitchInDegrees = toDegrees(orientationValues[1].toDouble())
             _angle = pitchInDegrees
 
             // Print the X-axis angle (pitch) to the console
             println("tokland:debug:X-axis angle X: %.1f".format(pitchInDegrees))
 
-            /*
+            // Example: Control torch based on angle (if angle > 45 degrees)
             if (pitchInDegrees > 45) {
-                this.torchToggleButton(true)
+                //this.torchToggleButton(true)
             } else {
-                this.torchToggleButton(false)
+                //this.torchToggleButton(false)
             }
-             */
         }
     }
 
@@ -107,9 +113,11 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 @Composable
 fun Greeting(name: String, modifier: Modifier = Modifier) {
     Text(
-        text = "Hello $name!",
+        text = name,
         modifier = modifier
     )
 }
 
-
+fun toDegrees(radians: Double): Double {
+    return radians * 180 / Math.PI
+}
